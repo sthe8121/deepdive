@@ -1,0 +1,1285 @@
+<!DOCTYPE TML>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepDive: Conceptual Learning</title>
+    <!-- Load Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons for UI elements --><script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Define a custom font family that mimics Palatino for the logo */
+        .logo-font {
+            font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+        }
+        /* New soft, light blue button (UPDATED TO DEEP TEAL) */
+        .soft-blue-btn {
+            background-color: #005f7a; /* Deep Teal */
+            color: white; 
+            transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s;
+        }
+        .soft-blue-btn:hover {
+            background-color: #004d61; /* Darker Teal for hover */
+            color: white;
+            box-shadow: 0 4px 10px -1px rgba(0, 0, 0, 0.2);
+        }
+        .soft-blue-btn:active {
+            transform: translateY(1px);
+        }
+        /* Base font for content */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Deeper Blue Gradient (UPDATED) */
+        .deep-blue-gradient {
+            background: linear-gradient(135deg, #0a5193 0%, #073763 100%);
+        }
+
+        /* Accent color variable */
+        :root {
+            --accent-color: #1e7aa8; /* New accent color */
+            --accent-color-light: #dbeafa; /* Lighter shade for backgrounds */
+            --accent-color-dark: #124d6d; /* Darker shade for hovers/active borders */
+        }
+
+        /* Styling for the diagram nodes and connections */
+        .diagram-node {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative; /* Needed for absolute positioning of the edit icon */
+        }
+        .diagram-node:hover {
+            transform: scale(1.03);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            background-color: #F3F4F6;
+        }
+        .active-element {
+            border: 3px solid var(--accent-color); /* Use accent color for active border */
+            background-color: var(--accent-color-light); /* Lighter accent for background */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .connection-point {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .connection-point:hover {
+            background-color: #BFDBFE; /* Blue 100 - kept for consistency, can be adjusted */
+            transform: scale(1.05);
+        }
+        .connection-point.active-element {
+            background-color: var(--accent-color-light); /* Lighter accent for active connection */
+        }
+        
+        /* Ensures the custom map nodes area looks like the example map area */
+        #custom-map-nodes {
+            min-height: 200px;
+        }
+
+        /* Responsive layout for the main content areas */
+        @media (max-width: 768px) {
+            #diagram-area, #info-panel {
+                max-height: 50vh; /* Make both scrollable on mobile */
+            }
+        }
+        /* CSS for the loading spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent-color); /* Use accent color for spinner */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Drag and Drop Styling */
+        .draggable-item {
+            cursor: grab;
+        }
+        .dragging {
+            opacity: 0.4;
+            border: 2px dashed var(--accent-color); /* Use accent color for dragging border */
+        }
+        
+        /* Drop Zone Styling */
+        .drop-target {
+            border-style: dashed;
+            border-width: 4px;
+            border-color: #8B5CF6; /* Purple for clear drop target */
+            background-color: #EDE9FE; /* Light Purple background */
+        }
+
+        /* Delete Button Styling */
+        .delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            padding: 4px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #EF4444; /* Red 500 */
+            transition: opacity 0.1s, background-color 0.1s;
+            z-index: 10;
+            opacity: 0; /* Hidden by default */
+        }
+        .diagram-node:hover > .delete-btn {
+            opacity: 1; /* Visible on node hover */
+        }
+        .delete-btn:hover {
+            background-color: #FEE2E2; /* Red 100 */
+            color: #B91C1C; /* Red 700 */
+        }
+        /* Style for the map tabs */
+        .map-tab {
+            padding: 8px 12px;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+        }
+        .map-tab.active-tab {
+            background-color: white;
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--accent-color);
+            z-index: 10;
+        }
+        .map-tab:not(.active-tab):hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- Global App Container --><div id="app" class="relative min-h-screen">
+
+        <!-- Home Page View (Initial View) --><div id="homepage" class="deep-blue-gradient flex flex-col items-center justify-center min-h-screen p-4 transition-opacity duration-500 ease-in-out">
+            <div class="max-w-4xl w-full mx-auto text-center p-8 md:p-12 lg:p-16 bg-white bg-opacity-95 rounded-2xl shadow-2xl backdrop-blur-sm">
+
+                <!-- Logo/Header --><h1 class="text-6xl md:text-8xl logo-font mb-8">
+                    <span class="font-light text-gray-700">Deep</span><span class="font-extrabold" style="color: #1e7aa8;">Dive</span> <!-- Updated logo color -->
+                </h1>
+
+                <!-- Tagline --><p class="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto">
+                    One source. One page. Zero hassle.
+                </p>
+
+                <!-- Call to Action Button --><button onclick="showView('diagram-page')" class="soft-blue-btn text-lg md:text-xl font-bold py-4 px-8 rounded-full shadow-lg uppercase tracking-wider">
+                    Start Conceptualizing
+                </button>
+
+                <!-- What DeepDive Does Section --><div class="mt-20 pt-8 border-t border-gray-200">
+                    <h2 class="text-2xl md:text-3xl font-extrabold" style="color: #1e7aa8;">What DeepDive does</h2>
+                    <p class="text-base md:text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                        Tired of scouring for just the information you need? With DeepDive, type it in, and you have it. All according to your needs.
+                    </p>
+                    <p class="text-base md:text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed mt-4 font-bold">
+                        You've never needed endless resources. All you needed was DeepDive.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagram/Editing Page View (Hidden initially) --><div id="diagram-page" class="hidden min-h-screen w-full flex flex-col transition-opacity duration-500 ease-in-out">
+            <!-- Diagram Header Bar --><header class="sticky top-0 z-10 bg-white shadow-md p-4 flex justify-between items-center flex-wrap gap-2">
+                <div class="logo-font text-2xl font-bold text-gray-700">
+                    <span class="font-light">Deep</span><span class="font-extrabold" style="color: #1e7aa8;">Dive</span> <!-- Updated logo color --></div>
+
+                <!-- Tabs --><div class="flex border-b border-gray-200 mx-auto md:mx-4">
+                    <button data-tab="example" onclick="switchMapMode('example')" class="tab-btn py-2 px-4 text-sm font-medium border-b-2 border-[var(--accent-color)] text-[var(--accent-color)] transition-colors">Example Map</button> <!-- Updated tab accent --><button data-tab="custom" onclick="switchMapMode('custom')" class="tab-btn py-2 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">Manual Builder</button>
+                </div>
+                
+                <button onclick="showView('homepage')" class="flex items-center space-x-1 text-sm text-gray-600 hover:text-[var(--accent-color)] px-3 py-1 rounded-lg border border-gray-300 transition-colors">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                    <span>Home</span>
+                </button>
+            </header>
+            
+            <!-- Custom Message Box --><div id="app-message-box" class="fixed top-20 right-4 p-3 rounded-lg shadow-xl text-white z-50 hidden opacity-0 transition-opacity duration-300"></div>
+
+            <main class="flex-grow flex flex-col md:flex-row overflow-hidden">
+
+                <!-- Mindmap/Diagram Area (Left/Top) --><section id="diagram-area" class="w-full md:w-3/5 p-4 lg:p-8 bg-gray-100 overflow-y-auto max-h-[50vh] md:max-h-full">
+                    <h3 id="map-title" class="text-lg font-bold text-gray-700 mb-4">Conceptual Map (Click Node or Connection)</h3>
+                    
+                    <div id="map-content">
+                        <!-- Example Map Content --><div id="example-map-content">
+                            <div id="mindmap-container" class="flex flex-col items-center space-y-8 py-8">
+                                <!-- Example Nodes and Connections will be injected here --></div>
+                        </div>
+
+                        <!-- Custom Map Content (Manual Builder) --><div id="custom-map-content" class="hidden py-8">
+                            <!-- Map Tabs for Multiple Custom Maps --><div id="custom-map-tabs" class="flex flex-wrap items-end gap-1 mb-4 border-b border-gray-300 -mt-8">
+                                <!-- Tabs will be injected here by renderMapTabs() -->
+                            </div>
+
+                            <!-- Disclaimer Text --><div class="p-4 mb-4 bg-[var(--accent-color-light)] border-l-4 border-[var(--accent-color)] text-[var(--accent-color-dark)] rounded-lg shadow-md"> <!-- Updated accent colors --><h4 class="font-bold mb-1 flex items-center">
+                                    <i data-lucide="pencil" class="w-5 h-5 mr-2"></i>Manual Map Builder
+                                </h4>
+                                <p class="text-sm">
+                                    Create your own conceptual hierarchy mind map by adding a main root element and then attaching sub-elements. You can drag and reorder your elements. Hover over an element and click the trash icon to delete it.
+                                    <br><span class="font-bold">Drag & Drop Logic:</span> Drag a node X onto node Y. If Y is the Root, X becomes a child of Y. If Y is NOT the Root, X becomes a sibling of Y.
+                                </p>
+                                <!-- Map Actions --><div class="mt-3 pt-3 border-t border-[var(--accent-color)]/30 flex space-x-3">
+                                    <button onclick="createNewMap()" class="text-sm text-[var(--accent-color)] hover:text-[var(--accent-color-dark)] font-semibold flex items-center">
+                                        <i data-lucide="plus-circle" class="w-4 h-4 mr-1"></i> New Map
+                                    </button>
+                                    <button onclick="deleteCurrentMap()" class="text-sm text-red-600 hover:text-red-800 font-semibold flex items-center" id="delete-map-btn">
+                                        <i data-lucide="x-circle" class="w-4 h-4 mr-1"></i> Delete Current Map
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Input and Button for Manual Creation --><div class="flex flex-col sm:flex-row gap-4 mb-8 p-4 bg-white rounded-xl shadow-lg">
+                                <div id="root-controls" class="flex flex-col sm:flex-row gap-2 w-full">
+                                    <input type="text" id="root-node-input" placeholder="Enter Root Concept (e.g., 'Physics')" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)]"> <!-- Updated accent focus --><button onclick="addRootNode()" class="soft-blue-btn px-4 py-3 rounded-lg font-semibold text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] flex-shrink-0">
+                                        Set Root
+                                    </button>
+                                </div>
+                                
+                                <div id="child-controls" class="hidden flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100 w-full">
+                                    <input type="text" id="child-node-input" placeholder="Enter Child Concept (e.g., 'Classical Mechanics')" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)]"> <!-- Updated accent focus --><button onclick="addChildNode()" class="soft-blue-btn px-4 py-3 rounded-lg font-semibold text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] flex-shrink-0">
+                                        Add Child to <span id="current-parent-name" class="font-extrabold text-white"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Custom Map Output Area --><div id="custom-map-nodes" class="flex flex-col items-center space-y-8 py-8">
+                                <p class="text-gray-500 italic" id="custom-map-placeholder">Start by setting a root concept above or create a new map.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Information Panel & Controls (Right/Bottom) --><section id="info-panel" class="w-full md:w-2/5 p-4 lg:p-8 bg-white shadow-xl flex flex-col overflow-y-auto max-h-[50vh] md:max-h-full">
+                    <h3 class="text-xl font-extrabold text-[var(--accent-color)] mb-4 border-b pb-2">Details & Controls</h3> <!-- Updated accent color --><!-- Control Group: Grade, Curriculum, Detail --><div class="space-y-4 mb-6">
+                        <!-- Row 1: Grade Level --><div class="flex items-center space-x-3">
+                            <label for="grade-level" class="text-gray-700 font-medium whitespace-nowrap min-w-[80px]">Grade Level:</label>
+                            <select id="grade-level" onchange="updateInfoPanel()" class="flex-grow p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] transition-colors"> <!-- Updated accent focus --><option value="K-8 / Basic">K-8 / Basic</option>
+                                <option value="9-12 / Intermediate" selected>9-12 / Intermediate</option>
+                            </select>
+                        </div>
+                        <!-- Row 2: Curriculum & Detail Toggle --><div class="flex items-center space-x-3">
+                            <label for="curriculum" class="text-gray-700 font-medium whitespace-nowrap min-w-[80px]">Curriculum:</label>
+                            <select id="curriculum" onchange="updateInfoPanel()" class="flex-grow p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] transition-colors"> <!-- Updated accent focus --><option value="General Science" selected>General Science</option>
+                                <option value="Oxford">Oxford</option>
+                                <option value="Cambridge">Cambridge</option>
+                                <option value="Pearson">Pearson</option>
+                                <option value="IB (International Baccalaureate)">IB (International Baccalaureate)</option>
+                            </select>
+                            
+                            <!-- Detail Toggle (Remains informational, not used for API yet) --><div class="flex items-center ml-4">
+                                <input type="checkbox" id="high-detail-mode" onchange="updateInfoPanel()" class="h-4 w-4 text-[var(--accent-color)] border-gray-300 rounded focus:ring-[var(--accent-color)]"> <!-- Updated accent color --><label for="high-detail-mode" class="ml-2 text-sm font-medium text-gray-700 whitespace-nowrap">High Detail</label>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- Selected Element Info --><div id="details-view" class="flex-grow space-y-4">
+                        <div id="selected-element-display" class="bg-[var(--accent-color-light)] p-3 rounded-lg border-l-4 border-[var(--accent-color)] text-gray-800"> <!-- Updated accent colors --><i data-lucide="info" class="w-5 h-5 inline-block mr-2 text-[var(--accent-color)]"></i> <!-- Updated accent color --><span class="font-medium" id="selected-element-name">No element selected.</span>
+                        </div>
+
+                        <!-- Summary Box --><div class="bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-400">
+                            <h4 class="font-bold text-yellow-800 flex items-center mb-1">
+                                <i data-lucide="book-open" class="w-4 h-4 mr-2"></i>Summary
+                            </h4>
+                            <p id="element-summary" class="text-sm text-gray-700 italic">Select a concept or connection to view its summary.</p>
+                        </div>
+
+                        <!-- Description Box --><div class="p-4 bg-gray-50 rounded-lg shadow-inner text-gray-600 min-h-[100px]">
+                            <h4 class="font-bold text-gray-700 flex items-center mb-2">
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i>Full Description
+                            </h4>
+                            <p id="element-description">Click on any element in the map to view its detailed description, which adjusts to your selected grade and curriculum.</p>
+                        </div>
+                        
+                        <!-- Sources Box --><div id="sources-container" class="mt-4 pt-3 border-t border-gray-200 hidden">
+                            <h4 class="font-semibold text-gray-700 mb-2 flex items-center">
+                                <i data-lucide="link" class="w-4 h-4 mr-2"></i>Sources (Grounding)
+                            </h4>
+                            <ul id="sources-list" class="list-disc list-inside space-y-1 text-xs text-gray-500 pl-4">
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="connections-view" class="mt-6 pt-4 border-t">
+                        <h4 class="font-semibold text-gray-700 mb-2">Connections:</h4>
+                        <ul id="connected-elements" class="list-disc list-inside space-y-1 text-sm text-gray-500">
+                            <li>Select a concept to see connected elements.</li>
+                        </ul>
+                    </div>
+
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- JavaScript for Logic and Interactivity --><script>
+        // --- Data Structures ---
+        let cardiovascularData = {
+            'Cardiovascular System': { parentId: null, children: ['Heart', 'Blood Vessels', 'Blood'] },
+            'Heart': { parentId: 'Cardiovascular System', children: ['Atria', 'Ventricles'] },
+            'Blood Vessels': { parentId: 'Cardiovascular System', children: ['Arteries', 'Veins', 'Capillaries'] },
+            'Blood': { parentId: 'Cardiovascular System', children: ['Plasma', 'Red Blood Cells'] },
+            'Atria': { parentId: 'Heart', children: [] },
+            'Ventricles': { parentId: 'Heart', children: [] },
+            'Arteries': { parentId: 'Blood Vessels', children: [] },
+            'Veins': { parentId: 'Blood Vessels', children: [] },
+            'Capillaries': { parentId: 'Blood Vessels', children: [] },
+            'Plasma': { parentId: 'Blood', children: [] },
+            'Red Blood Cells': { parentId: 'Blood', children: [] }
+        };
+        
+        // New structure for multiple custom maps
+        let allCustomMaps = {
+            'map-1': {
+                name: 'MindMap 1', // Initial map named MindMap 1
+                data: {
+                    'A (Root Concept)': { parentId: null, children: ['B (Parent)', 'Z (Sibling)'] },
+                    'B (Parent)': { parentId: 'A (Root Concept)', children: ['C (Child of B)'] },
+                    'Z (Sibling)': { parentId: 'A (Root Concept)', children: [] }, 
+                    'C (Child of B)': { parentId: 'B (Parent)', children: [] }
+                }
+            }
+        }; 
+        let currentMapId = 'map-1'; // Tracks which custom map is active
+        
+        // --- State variables ---
+        let currentActiveElement = {
+            type: 'node', // 'node' or 'connection'
+            key: 'A (Root Concept)' // Node key or Connection key
+        };
+        let currentMapMode = 'example'; // 'example' or 'custom'
+        let abortController = new AbortController(); // For cancelling ongoing fetch requests
+
+        let draggedNodeKey = null; // Key of the node being dragged
+
+        // --- Utility Functions ---
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        function getCurrentMapData() {
+            if (currentMapMode === 'example') return cardiovascularData;
+            return allCustomMaps[currentMapId] ? allCustomMaps[currentMapId].data : {};
+        }
+
+        function showAppMessage(message, type = 'info') {
+            const box = document.getElementById('app-message-box');
+            box.className = 'fixed top-20 right-4 p-3 rounded-lg shadow-xl text-white z-50 transition-opacity duration-300';
+            box.textContent = message;
+            
+            if (type === 'error') box.classList.add('bg-red-600');
+            else if (type === 'success') box.classList.add('bg-green-600');
+            else box.classList.add('bg-[var(--accent-color)]'); // Use accent color for info messages
+
+            box.classList.remove('hidden', 'opacity-0');
+            box.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                box.classList.remove('opacity-100');
+                box.classList.add('opacity-0');
+                setTimeout(() => box.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        function displaySources(sources) {
+            const sourcesContainer = document.getElementById('sources-container');
+            const sourcesList = document.getElementById('sources-list');
+            sourcesList.innerHTML = '';
+
+            if (sources && sources.length > 0) {
+                sourcesContainer.classList.remove('hidden');
+                sources.forEach(source => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = source.uri;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.textContent = source.title || source.uri;
+                    a.className = 'text-[var(--accent-color)] hover:text-[var(--accent-color-dark)] hover:underline'; // Updated accent color
+                    li.appendChild(a);
+                    sourcesList.appendChild(li);
+                });
+            } else {
+                 sourcesContainer.classList.add('hidden');
+            }
+        }
+        
+        /** Shows a loading spinner and 'Loading...' text in the detail panel. */
+        function setContentLoading() {
+            const loadingHtml = `<div class="flex items-center space-x-2 text-[var(--accent-color)]">
+                                    <div class="loader"></div>
+                                    <span>Loading content from AI...</span>
+                                </div>`;
+            document.getElementById('element-summary').innerHTML = loadingHtml;
+            document.getElementById('element-description').textContent = 'Fetching detailed explanation...';
+            document.getElementById('sources-container').classList.add('hidden');
+        }
+
+        /** Resets the detail panel with the fetched content. */
+        function setContentFinished(summary, description, sources) {
+            document.getElementById('element-summary').textContent = summary || "N/A";
+            document.getElementById('element-description').textContent = description || "N/A";
+            displaySources(sources);
+        }
+
+
+        // --- Gemini API Logic (omitted for brevity, assume content generation works) ---
+
+        async function fetchGeminiContent(key, type, grade, curriculum, maxRetries = 5) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            // Cancel any previous requests
+            abortController.abort();
+            abortController = new AbortController();
+            const signal = abortController.signal;
+
+            const highDetail = document.getElementById('high-detail-mode').checked;
+
+            const systemPrompt = `You are an expert educational content writer. Your task is to generate both a concise summary and a detailed description for a concept in a mindmap.
+                1. Context: The content must be tailored for a student at the ${grade} level, adhering to the style of the ${curriculum} curriculum. ${highDetail ? 'Provide highly detailed, in-depth explanations.' : 'Provide standard, clear explanations.'}
+                2. Summary (Required): Provide a brief, concise summary of the concept (maximum 2 short sentences).
+                3. Description (Required): Provide a detailed explanation (3-5 comprehensive sentences) suitable for the specified student level.
+                4. Connections: If the input is a connection (a relationship between two concepts), only provide a single, detailed description (3-5 sentences) explaining the relationship, and leave the summary empty.
+                5. Formatting: Output the result as plain text, using a single newline between the summary and the description.
+                6. Style: Maintain an educational, encouraging, and clear tone.`;
+
+            let userQuery;
+            if (type === 'node') {
+                userQuery = `Generate the content for the conceptual topic: "${key}".`;
+            } else { // 'connection'
+                userQuery = `Generate the detailed description for the connection: "${key.replace('_', ' to ')}".`;
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        signal: signal
+                    });
+
+                    if (signal.aborted) {
+                        return { summary: "Request cancelled.", description: "New request initiated.", sources: [] };
+                    }
+
+                    if (!response.ok) {
+                        if (response.status !== 429) throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
+
+                    if (candidate && candidate.content?.parts?.[0]?.text) {
+                        const text = candidate.content.parts[0].text;
+                        // Split the text into summary and description using the single newline convention
+                        let parts = text.split('\n');
+                        
+                        // Handle node content: expect summary (index 0) and description (index 1+)
+                        let summaryText = type === 'node' && parts.length > 0 ? parts[0].trim() : "---";
+                        let descriptionText = type === 'node' && parts.length > 1 ? parts.slice(1).join('\n').trim() : parts.join('\n').trim();
+
+                        // For connections, the entire response is the description
+                        if (type === 'connection') {
+                             summaryText = "See Full Description below.";
+                             descriptionText = text.trim();
+                        }
+
+
+                        // 2. Extract grounding sources
+                        let sources = [];
+                        const groundingMetadata = candidate.groundingMetadata;
+                        if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                            sources = groundingMetadata.groundingAttributions
+                                .map(attribution => ({
+                                    uri: attribution.web?.uri,
+                                    title: attribution.web?.title,
+                                }))
+                                .filter(source => source.uri && source.title);
+                        }
+
+                        return { summary: summaryText, description: descriptionText, sources };
+                    }
+
+                    throw new Error("API response successful but content was empty.");
+
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        return { summary: "Request cancelled.", description: "New request initiated.", sources: [] };
+                    }
+                    console.error(`Attempt ${i + 1} failed for Gemini API:`, error);
+                    if (i === maxRetries - 1) {
+                        return { summary: "Error generating summary.", description: "Failed to fetch content from the AI after multiple retries.", sources: [] };
+                    }
+                    await delay(Math.pow(2, i) * 1000); // Exponential backoff
+                }
+            }
+        }
+
+
+        // --- Custom Map Management Functions ---
+
+        /** Switches the active custom map tab. */
+        function loadMap(mapId) {
+            currentMapId = mapId;
+            const currentMap = allCustomMaps[mapId];
+
+            if (currentMap && Object.keys(currentMap.data).length > 0) {
+                 const rootKey = Object.keys(currentMap.data).find(k => currentMap.data[k].parentId === null);
+                 // If the previously active element is gone, select the root
+                 if (!currentMap.data[currentActiveElement.key]) {
+                     currentActiveElement = { type: 'node', key: rootKey };
+                 }
+            } else {
+                 currentActiveElement = { type: 'node', key: null };
+            }
+            
+            renderMap(currentMap.data);
+            renderMapTabs();
+            lucide.createIcons();
+            handleElementClick(currentActiveElement.type, currentActiveElement.key, true);
+        }
+
+        /** Creates a new empty map. */
+        function createNewMap() {
+            const newMapId = 'map-' + Date.now();
+            const mapCount = Object.keys(allCustomMaps).length + 1;
+            const newMapName = `MindMap ${mapCount}`; // Updated naming convention
+            
+            allCustomMaps[newMapId] = {
+                name: newMapName,
+                data: {}
+            };
+            loadMap(newMapId);
+            showAppMessage(`New map "${newMapName}" created.`, 'success');
+        }
+
+        /** Deletes the current active map and switches to the next available one. */
+        function deleteCurrentMap() {
+            const mapIds = Object.keys(allCustomMaps);
+            if (mapIds.length <= 1) {
+                showAppMessage("Cannot delete the last remaining map.", 'error');
+                return;
+            }
+
+            const currentMapName = allCustomMaps[currentMapId].name;
+            delete allCustomMaps[currentMapId];
+            
+            // Switch to the first available map
+            const newMapId = Object.keys(allCustomMaps)[0];
+            loadMap(newMapId);
+
+            showAppMessage(`Map "${currentMapName}" deleted. Switched to "${allCustomMaps[newMapId].name}".`, 'info');
+        }
+
+        /** Renders the tabs for switching between custom maps. */
+        function renderMapTabs() {
+            const tabsContainer = document.getElementById('custom-map-tabs');
+            tabsContainer.innerHTML = '';
+            
+            const mapIds = Object.keys(allCustomMaps);
+            
+            mapIds.forEach(id => {
+                const map = allCustomMaps[id];
+                const tab = document.createElement('div');
+                tab.className = `map-tab text-gray-700 ${id === currentMapId ? 'active-tab' : ''}`;
+                tab.textContent = map.name;
+                tab.onclick = () => loadMap(id);
+                
+                tabsContainer.appendChild(tab);
+            });
+            
+            // Re-enable/disable delete button based on map count
+            const deleteBtn = document.getElementById('delete-map-btn');
+            if (deleteBtn) {
+                 deleteBtn.disabled = mapIds.length === 1;
+                 deleteBtn.classList.toggle('opacity-50', mapIds.length === 1);
+            }
+        }
+
+        // --- Manual Builder Functions ---
+
+        /** Sets the root node for the custom map. */
+        function addRootNode() {
+            const inputEl = document.getElementById('root-node-input');
+            const rootName = inputEl.value.trim();
+            const placeholder = document.getElementById('custom-map-placeholder');
+            const data = allCustomMaps[currentMapId].data;
+            
+            if (!rootName) {
+                showAppMessage("Please enter a concept name.", 'error');
+                return;
+            }
+            
+            // Check if a root already exists for this map
+            const currentRoot = Object.keys(data).find(k => data[k].parentId === null);
+            if (currentRoot) {
+                showAppMessage(`Map already has a root: "${currentRoot}". Delete the root and its children first if you wish to change it.`, 'error');
+                return;
+            }
+
+            data[rootName] = { parentId: null, children: [] };
+            
+            // Reset current active element to the new root
+            currentActiveElement = { type: 'node', key: rootName };
+            
+            inputEl.value = '';
+            renderMap(data);
+            lucide.createIcons(); // Ensure icons render after map update
+            handleElementClick('node', rootName); // Update panel for new root
+            showChildControls(rootName);
+            
+            if (placeholder) { // Added null check here
+                placeholder.classList.add('hidden');
+            }
+            showAppMessage(`Root concept "${rootName}" added successfully.`, 'success');
+        }
+        
+        /** Adds a child node to the currently active parent node. */
+        function addChildNode() {
+            const inputEl = document.getElementById('child-node-input');
+            let childName = inputEl.value.trim();
+            const parentKey = currentActiveElement.key;
+            const data = allCustomMaps[currentMapId].data;
+
+            if (!childName || !parentKey || !data[parentKey]) {
+                showAppMessage("Please select a parent node and enter a child name.", 'error');
+                return;
+            }
+            
+            // Basic sanitization/check for duplicates
+            if (Object.keys(data).includes(childName)) {
+                 // Append a number if it's a duplicate
+                 let counter = 1;
+                 let tempName = childName;
+                 while(Object.keys(data).includes(`${tempName} ${counter}`)) {
+                     counter++;
+                 }
+                 childName = `${tempName} ${counter}`;
+                 showAppMessage(`Concept name adjusted to "${childName}" due to duplication.`, 'info');
+            }
+
+            // Add child to the parent's children array
+            data[parentKey].children.push(childName);
+            
+            // Add the new child node structure
+            data[childName] = { parentId: parentKey, children: [] };
+            
+            inputEl.value = '';
+            renderMap(data);
+            lucide.createIcons(); // Ensure icons render after map update
+            handleElementClick('node', childName); // Select the new child
+            showAppMessage(`Child concept "${childName}" added to "${parentKey}".`, 'success');
+        }
+        
+        /** Removes a node and recursively removes all its descendants. */
+        function deleteNode(nodeKey) {
+            const data = allCustomMaps[currentMapId].data;
+
+            // 1. Root deletion check
+            const rootKey = Object.keys(data).find(k => data[k].parentId === null);
+
+            // Check if the root node actually has children.
+            if (nodeKey === rootKey && data[rootKey] && data[rootKey].children.length > 0) {
+                showAppMessage('Cannot delete the root concept while it still has children. Delete its children first.', 'error');
+                return;
+            }
+            
+            const parentKey = data[nodeKey]?.parentId; // Capture parent before deletion
+
+            // 2. Remove from parent's children list
+            if (parentKey && data[parentKey]) {
+                data[parentKey].children = data[parentKey].children.filter(child => child !== nodeKey);
+            }
+
+            let deletedCount = 0;
+            // 3. Recursively delete node and children from the data structure
+            function recursiveDelete(key) {
+                if (data[key] && data[key].children) {
+                    // Iterate over a copy to safely handle recursive deletion
+                    const childrenCopy = [...data[key].children]; 
+                    childrenCopy.forEach(childKey => {
+                        // Check if the child still exists (it might have been deleted by another branch)
+                        if (data[childKey]) { 
+                            recursiveDelete(childKey);
+                        }
+                    });
+                }
+                // CRITICAL FIX: Ensure deletion happens last.
+                if (data[key]) {
+                    delete data[key];
+                    deletedCount++;
+                }
+            }
+            recursiveDelete(nodeKey);
+
+            // 4. Update active element state
+            if (currentActiveElement.key === nodeKey || !data[currentActiveElement.key]) {
+                // If the deleted node was active, or the active element was a descendant, reset selection
+                currentActiveElement = { type: 'node', key: parentKey || rootKey || null };
+            }
+            
+            // If the map is now empty, ensure we reset the state fully
+             if (Object.keys(data).length === 0) {
+                 currentActiveElement = { type: 'node', key: null };
+             }
+
+            
+            renderMap(data);
+            lucide.createIcons(); // Ensure icons render after map update
+            handleElementClick(currentActiveElement.type, currentActiveElement.key, true); // Update panel for new selection/empty map
+            
+            if (deletedCount > 0) {
+                showAppMessage(`Deleted "${nodeKey}" and ${deletedCount - 1} connected sub-elements.`, 'info');
+            } else {
+                 showAppMessage(`Deletion of "${nodeKey}" failed.`, 'error');
+            }
+        }
+
+        // --- Core Application Logic (Definitions added) ---
+
+        function showView(viewId) {
+            document.getElementById('homepage').classList.add('hidden', 'opacity-0');
+            document.getElementById('diagram-page').classList.add('hidden', 'opacity-0');
+
+            const viewElement = document.getElementById(viewId);
+            if (viewElement) {
+                viewElement.classList.remove('hidden');
+                setTimeout(() => viewElement.classList.remove('opacity-0'), 10);
+            }
+
+            // Ensure the map is rendered when transitioning to the diagram page
+            if (viewId === 'diagram-page') {
+                switchMapMode(currentMapMode);
+                // Ensure the info panel updates for the initial selection
+                handleElementClick(currentActiveElement.type, currentActiveElement.key, true);
+            }
+        }
+        
+        function switchMapMode(mode) {
+            currentMapMode = mode;
+            document.getElementById('example-map-content').classList.add('hidden');
+            document.getElementById('custom-map-content').classList.add('hidden');
+            
+            // Remove active state from all tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-[var(--accent-color)]', 'text-[var(--accent-color)]');
+                btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            });
+
+            // Set active state for the current tab
+            const activeTab = document.querySelector(`.tab-btn[data-tab="${mode}"]`);
+            if (activeTab) {
+                activeTab.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+                activeTab.classList.add('border-[var(--accent-color)]', 'text-[var(--accent-color)]');
+            }
+            
+            const placeholder = document.getElementById('custom-map-placeholder');
+
+            if (mode === 'example') {
+                document.getElementById('example-map-content').classList.remove('hidden');
+                document.getElementById('map-title').textContent = 'Conceptual Map: Cardiovascular System (Click Node or Connection)';
+                renderMap(cardiovascularData);
+                lucide.createIcons(); // Render icons for the example map
+                // Set initial selection for example mode if not already set
+                const rootKey = Object.keys(cardiovascularData).find(k => cardiovascularData[k].parentId === null);
+                if (!currentActiveElement.key || !cardiovascularData[currentActiveElement.key]) {
+                    currentActiveElement = { type: 'node', key: rootKey };
+                }
+                showChildControls(null); // Hide child controls in example mode
+                if (placeholder) { placeholder.classList.add('hidden'); } // Ensure hidden in example mode
+                
+            } else { // 'custom' mode
+                document.getElementById('custom-map-content').classList.remove('hidden');
+                // Removed the instructional text
+                document.getElementById('map-title').textContent = 'Your Custom Conceptual Map';
+                
+                const currentMap = allCustomMaps[currentMapId];
+                const mapData = currentMap ? currentMap.data : {};
+                
+                renderMap(mapData);
+                renderMapTabs(); // Render map tabs for custom mode
+                lucide.createIcons(); // Render icons for the custom map
+                
+                // Update child controls visibility based on selected node
+                if (currentActiveElement.key && mapData[currentActiveElement.key]) {
+                    showChildControls(currentActiveElement.key);
+                } else {
+                    showChildControls(null);
+                }
+                // If custom map is empty, reset selection
+                if (Object.keys(mapData).length === 0) {
+                    currentActiveElement = { type: 'node', key: null };
+                    if (placeholder) { placeholder.classList.remove('hidden'); } // Ensure visible if map is empty
+                } else {
+                    if (placeholder) { placeholder.classList.add('hidden'); } // Ensure hidden if map is not empty
+                }
+            }
+            // Ensure the details panel reflects the current state
+            handleElementClick(currentActiveElement.type, currentActiveElement.key, true);
+        }
+        
+        function updateInfoPanel() {
+            // This function is primarily a trigger for content fetching when controls change
+            if (currentActiveElement.key) {
+                handleElementClick(currentActiveElement.type, currentActiveElement.key, true);
+            }
+        }
+
+        function handleElementClick(type, key, forceUpdate = false) {
+            
+            const data = getCurrentMapData();
+
+            // --- FIX: Check for null/undefined key on initial load or reset ---
+            if (!key || !data || !data[key]) { // Added check for data[key] existence
+                 currentActiveElement = { type: 'node', key: null };
+                 document.getElementById('selected-element-name').textContent = 'No element selected.';
+                 document.getElementById('element-summary').textContent = 'Select a concept or connection to view its summary.';
+                 document.getElementById('element-description').textContent = 'Click on any element in the map to view its detailed description, which adjusts to your selected grade and curriculum.';
+                 document.getElementById('connected-elements').innerHTML = '<li>Select a concept to see connected elements.</li>';
+                 document.getElementById('sources-container').classList.add('hidden');
+                 showChildControls(null);
+                 return;
+            }
+            // -----------------------------------------------------------------
+
+            const grade = document.getElementById('grade-level').value;
+            const curriculum = document.getElementById('curriculum').value;
+            // Sanitization for elementId generation, removing non-alphanumeric chars first
+            const elementId = `element-${key.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}`; 
+
+            // Remove active classes from all nodes and connections
+            document.querySelectorAll('.active-element').forEach(el => {
+                el.classList.remove('active-element');
+            });
+            
+            // Check if we are selecting the same element and not forcing an update
+            if (currentActiveElement.key === key && !forceUpdate) {
+                // If the same element is clicked, toggle off (if it's a node)
+                if (type === 'node') {
+                     currentActiveElement = { type: 'node', key: null };
+                     document.getElementById('selected-element-name').textContent = 'No element selected.';
+                     document.getElementById('element-summary').textContent = 'Select a concept or connection to view its summary.';
+                     document.getElementById('element-description').textContent = 'Click on any element in the map to view its detailed description, which adjusts to your selected grade and curriculum.';
+                     document.getElementById('connected-elements').innerHTML = '<li>Select a concept to see connected elements.</li>';
+                     document.getElementById('sources-container').classList.add('hidden');
+                     showChildControls(null);
+                     return;
+                }
+            }
+
+            // Update state and UI
+            currentActiveElement = { type, key };
+            
+            // 1. Highlight the selected element
+            const selectedElement = document.getElementById(elementId);
+            if (selectedElement) {
+                selectedElement.classList.add('active-element');
+            }
+            
+            // 2. Update Details & Controls Panel
+            let name;
+            let connectionsHtml = '';
+            
+            if (type === 'node') {
+                name = key;
+                const nodeInfo = data[key];
+                
+                if (nodeInfo) {
+                    // Show parent connection
+                    if (nodeInfo.parentId) {
+                         connectionsHtml += `<li><span class="font-bold">Parent:</span> ${nodeInfo.parentId}</li>`;
+                    }
+                    // Show children connections
+                    if (nodeInfo.children.length > 0) {
+                        connectionsHtml += nodeInfo.children.map(child => 
+                            `<li><span class="font-bold">Child:</span> ${child}</li>`
+                        ).join('');
+                    }
+                    if (!nodeInfo.parentId && nodeInfo.children.length === 0) {
+                        connectionsHtml = '<li>This node has no connections.</li>';
+                    }
+                }
+                
+                // For custom map, update child controls to target this node
+                if (currentMapMode === 'custom') {
+                    showChildControls(key);
+                }
+                
+            } else { // connection
+                name = `Connection: ${key.replace('_', ' to ')}`;
+                connectionsHtml = '<li>This is a connection. Select a node to see its neighbors.</li>';
+                showChildControls(null); // Hide child controls for connections
+            }
+
+            document.getElementById('selected-element-name').textContent = name;
+            document.getElementById('connected-elements').innerHTML = connectionsHtml;
+
+            // 3. Fetch and update Gemini content
+            setContentLoading();
+            fetchGeminiContent(key, type, grade, curriculum)
+                .then(({ summary, description, sources }) => {
+                    setContentFinished(summary, description, sources);
+                });
+        }
+
+        // --- Map Rendering ---
+
+        function renderMap(data) {
+            const containerId = currentMapMode === 'example' ? 'mindmap-container' : 'custom-map-nodes';
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.innerHTML = '';
+            
+            // Find the root node
+            const rootKey = Object.keys(data).find(key => data[key].parentId === null);
+            const placeholder = document.getElementById('custom-map-placeholder');
+
+            if (!rootKey) {
+                if (currentMapMode === 'custom' && placeholder) { 
+                    placeholder.classList.remove('hidden');
+                }
+                return;
+            }
+
+            if (currentMapMode === 'custom' && placeholder) { 
+                placeholder.classList.add('hidden');
+            }
+
+            // Start recursive rendering from the root
+            const rootElement = createNodeElement(rootKey, data);
+            container.appendChild(rootElement);
+
+            // Re-apply active class after rendering
+            if (currentActiveElement.key) {
+                 const activeElement = document.getElementById(`element-${currentActiveElement.key.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}`);
+                 if (activeElement) {
+                     activeElement.classList.add('active-element');
+                 }
+            }
+        }
+
+        function createNodeElement(key, data) {
+            const nodeInfo = data[key];
+            if (!nodeInfo) return null;
+
+            const isRoot = nodeInfo.parentId === null;
+            // Use sanitized key for ID creation
+            const sanitizedKey = key.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+            const elementId = `element-${sanitizedKey}`;
+
+            // --- Node Div ---
+            const nodeDiv = document.createElement('div');
+            nodeDiv.id = elementId;
+            nodeDiv.className = `diagram-node bg-white p-3 rounded-xl shadow-lg border-2 border-transparent max-w-sm w-full transition-colors ${currentMapMode === 'custom' ? 'draggable-item' : ''}`;
+            nodeDiv.textContent = key;
+            nodeDiv.setAttribute('data-key', key);
+            nodeDiv.setAttribute('data-type', 'node');
+            
+            // Drag listeners
+            if (currentMapMode === 'custom') {
+                nodeDiv.draggable = true;
+                nodeDiv.addEventListener('dragstart', handleDragStart);
+                nodeDiv.addEventListener('dragover', handleDragOver);
+                nodeDiv.addEventListener('dragleave', handleDragLeave);
+                nodeDiv.addEventListener('drop', handleDrop);
+            }
+
+            nodeDiv.onclick = (e) => {
+                e.stopPropagation();
+                handleElementClick('node', key);
+            };
+
+            // Add Delete Button (Only for custom map)
+            if (currentMapMode === 'custom') {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '<i data-lucide="trash-2" class="w-4 h-4"></i>';
+                
+                // Execute deletion directly
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteNode(key);
+                };
+                
+                // Append the button
+                nodeDiv.appendChild(deleteBtn);
+            }
+
+
+            // --- Children Container (Recursive) ---
+            const childrenContainer = document.createElement('div');
+            
+            // Always use flex-row for children to ensure horizontal positioning of siblings.
+            childrenContainer.className = `flex flex-row items-start justify-center flex-wrap gap-8 mt-6`;
+            
+            // Render children
+            nodeInfo.children.forEach(childKey => {
+                const childElement = createNodeElement(childKey, data);
+                if (childElement) {
+                    // Connection element
+                    const connectionSanitizedKey = `${key}_${childKey}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                    const connectionId = `element-${connectionSanitizedKey}`;
+                    const connectionDiv = document.createElement('div');
+                    connectionDiv.id = connectionId;
+                    connectionDiv.className = 'connection-point px-4 py-1 bg-gray-200 text-xs text-gray-700 rounded-full border-2 border-transparent transition-colors shadow-sm cursor-pointer whitespace-nowrap';
+                    connectionDiv.textContent = 'Connection'; 
+                    connectionDiv.setAttribute('data-key', `${key}_${childKey}`);
+                    connectionDiv.setAttribute('data-type', 'connection');
+                    
+                    connectionDiv.onclick = (e) => {
+                        e.stopPropagation();
+                        handleElementClick('connection', `${key}_${childKey}`);
+                    };
+
+                    const wrapper = document.createElement('div');
+                    // This wrapper ensures the connection text and the child node stack vertically
+                    wrapper.className = `flex flex-col items-center gap-6 min-w-[200px] max-w-[250px]`;
+                    
+                    wrapper.appendChild(connectionDiv);
+                    wrapper.appendChild(childElement);
+                    childrenContainer.appendChild(wrapper);
+                }
+            });
+
+            const fragment = document.createDocumentFragment();
+            fragment.appendChild(nodeDiv);
+            if (nodeInfo.children.length > 0) {
+                fragment.appendChild(childrenContainer);
+            }
+
+            // Wrap for drag-and-drop hierarchy if needed (simplicity: only handle nodeDiv and childrenContainer)
+            const mainWrapper = document.createElement('div');
+            mainWrapper.className = `flex flex-col items-center ${isRoot ? 'w-full' : ''}`;
+            mainWrapper.appendChild(nodeDiv);
+            if (nodeInfo.children.length > 0) {
+                mainWrapper.appendChild(childrenContainer);
+            }
+
+            return mainWrapper;
+        }
+
+        // --- Drag and Drop Logic (for Custom Map reordering) ---
+
+        function handleDragStart(e) {
+            draggedNodeKey = e.target.getAttribute('data-key');
+            e.dataTransfer.setData('text/plain', draggedNodeKey);
+            // Hide the original node element while dragging
+            setTimeout(() => e.target.classList.add('opacity-40'), 0);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Allows drop
+            const targetNode = e.target.closest('.diagram-node');
+            
+            // Clean up previous visual state for all nodes
+            document.querySelectorAll('.diagram-node').forEach(el => el.classList.remove('drop-target'));
+            
+            if (targetNode && draggedNodeKey !== targetNode.getAttribute('data-key')) {
+                 targetNode.classList.add('drop-target');
+            }
+        }
+        
+        function handleDragLeave(e) {
+             const targetNode = e.target.closest('.diagram-node');
+             if (targetNode) {
+                targetNode.classList.remove('drop-target');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            
+            const targetNode = e.target.closest('.diagram-node');
+            if (!targetNode) return;
+            
+            const targetKey = targetNode.getAttribute('data-key');
+            const customMapData = allCustomMaps[currentMapId].data;
+            
+            // Clean up visual state
+            document.querySelectorAll('.diagram-node').forEach(el => el.classList.remove('opacity-40', 'drop-target'));
+
+            if (!draggedNodeKey || draggedNodeKey === targetKey) {
+                // Restore dragged node opacity if nothing happened
+                document.querySelector(`.diagram-node[data-key="${draggedNodeKey}"]`)?.classList.remove('opacity-40');
+                return;
+            }
+            
+            const draggedInfo = customMapData[draggedNodeKey];
+            const targetInfo = customMapData[targetKey];
+            
+            if (!draggedInfo || !targetInfo) return;
+
+            const oldParentKey = draggedInfo.parentId;
+            
+            // --- 1. Sibling Reorder Check (Priority 1: Reorder siblings under the same parent) ---
+            if (targetInfo.parentId === oldParentKey && oldParentKey !== null) {
+                const parentChildren = customMapData[oldParentKey].children;
+                const draggedIndex = parentChildren.indexOf(draggedNodeKey);
+                const targetIndex = parentChildren.indexOf(targetKey);
+                
+                if (draggedIndex > -1 && targetIndex > -1) {
+                    // Reorder the array
+                    parentChildren.splice(draggedIndex, 1); // Remove dragged
+                    parentChildren.splice(targetIndex, 0, draggedNodeKey); // Insert at target position
+                    
+                    showAppMessage(`Reordered siblings: "${draggedNodeKey}" moved next to "${targetKey}".`, 'success');
+                    draggedNodeKey = null;
+                    renderMap(customMapData);
+                    lucide.createIcons();
+                    return; 
+                }
+            } 
+            
+            // --- 2. Reparenting Check (Priority 2: Move X as a SIBLING of Y or a CHILD of Root) ---
+            
+            let newParentKey;
+            let placementMessage;
+            
+            // Y is the Root Node
+            if (targetInfo.parentId === null) {
+                // Dragging onto the Root always means X becomes a CHILD of the Root.
+                newParentKey = targetKey; 
+                placementMessage = `is now a child of the Root Concept: ${targetKey}.`;
+                
+                if (newParentKey === oldParentKey) {
+                    showAppMessage('No change: Node is already a child of the root.', 'info');
+                    return;
+                }
+            } 
+            // Y is a standard Node (Y has a Parent P)
+            else { 
+                // X becomes a SIBLING of Y, meaning the new parent is Y's parent (P).
+                newParentKey = targetInfo.parentId;
+                placementMessage = `is now a sibling of ${targetKey} (under parent ${newParentKey}).`;
+                
+                if (newParentKey === oldParentKey) {
+                    showAppMessage('No change: Node is already a sibling of the target.', 'info');
+                    return;
+                }
+            }
+            
+            // Cycle check: Ensure the new parent is not a descendant of the dragged node
+            let isDescendant = false;
+            let current = newParentKey;
+            while(current && customMapData[current]) {
+                if (current === draggedNodeKey) {
+                    isDescendant = true;
+                    break;
+                }
+                current = customMapData[current].parentId;
+            }
+            if (isDescendant) {
+                showAppMessage('Cannot move a node to its own descendant, as this creates a circular dependency.', 'error');
+                return;
+            }
+            
+            // --- Execute Reparenting ---
+            
+            // Remove X from its old parent's children list
+            if (oldParentKey && customMapData[oldParentKey]) {
+                customMapData[oldParentKey].children = customMapData[oldParentKey].children.filter(child => child !== draggedNodeKey);
+            }
+            
+            // Update X's parentId
+            draggedInfo.parentId = newParentKey;
+
+            // Add X to the new parent's children list
+            if (newParentKey === targetKey) { 
+                // Case: X becomes a CHILD of Root (targetKey = newParentKey)
+                customMapData[newParentKey].children.push(draggedNodeKey);
+
+            } else { 
+                // Case: X becomes a SIBLING of Y (newParentKey is P)
+                const parentChildren = customMapData[newParentKey].children;
+                const targetIndex = parentChildren.indexOf(targetKey);
+
+                if (targetIndex !== -1) {
+                    // Insert X immediately after Y
+                    parentChildren.splice(targetIndex + 1, 0, draggedNodeKey);
+                } else {
+                    // Fallback: just push if target Y wasn't found in P's list (should not happen)
+                    parentChildren.push(draggedNodeKey);
+                }
+            }
+            
+            showAppMessage(`"${draggedNodeKey}" ${placementMessage}`, 'success');
+            
+            draggedNodeKey = null;
+            renderMap(customMapData);
+            lucide.createIcons();
+        }
+        
+        // --- Custom Map Controls UI ---
+        
+        function showChildControls(parentKey) {
+            const rootControls = document.getElementById('root-controls');
+            const childControls = document.getElementById('child-controls');
+            const parentNameEl = document.getElementById('current-parent-name');
+            const currentMapData = getCurrentMapData();
+            const rootKey = Object.keys(currentMapData).find(k => currentMapData[k]?.parentId === null);
+            
+            if (currentMapMode === 'example') {
+                 rootControls.classList.remove('hidden'); // Keep visible for example mode to allow switching to custom
+                 childControls.classList.add('hidden');
+                 return;
+            }
+
+            if (rootKey && parentKey) {
+                // Map exists and a node is selected
+                rootControls.classList.remove('hidden'); // Keep root visible for editing root node
+                childControls.classList.remove('hidden');
+                parentNameEl.textContent = parentKey;
+            } else if (rootKey && !parentKey) {
+                 // Map exists but nothing is selected
+                rootControls.classList.remove('hidden');
+                childControls.classList.add('hidden');
+            } else {
+                 // Map is empty
+                rootControls.classList.remove('hidden');
+                childControls.classList.add('hidden');
+            }
+        }
+
+        // --- Initialization ---
+
+        function initializeApp() {
+            // Set initial view to homepage
+            showView('homepage');
+            
+            // For custom map, ensure the initial element is selected
+            const initialMapData = allCustomMaps[currentMapId].data;
+            const rootKey = Object.keys(initialMapData).find(k => initialMapData[k].parentId === null);
+            currentActiveElement = { type: 'node', key: rootKey || null };
+            
+            // Render map tabs initially
+            renderMapTabs();
+
+            // Initialize lucide icons for elements created dynamically
+            lucide.createIcons();
+
+            // Setup global drop/drag listeners on the main container
+            const customMapContainer = document.getElementById('custom-map-nodes');
+            // Listeners are moved to individual node elements in createNodeElement() now.
+            
+            // Initial render of the map area
+            switchMapMode(currentMapMode); 
+        }
+
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
+
